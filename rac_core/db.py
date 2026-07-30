@@ -191,6 +191,15 @@ def delete_activity(activity_id: int) -> None:
     client().table("activities").delete().eq("id", activity_id).execute()
 
 
+
+def _table_exists(table_name: str) -> bool:
+    try:
+        client().table(table_name).select("*").limit(1).execute()
+        return True
+    except Exception:
+        return False
+
+
 def export_all() -> dict[str, Any]:
     """Return a portable snapshot of every RAC table currently used by the app."""
     return {
@@ -202,6 +211,8 @@ def export_all() -> dict[str, Any]:
             or []
         ),
         "profile": get_profile(),
+        "coach_memories": get_memories(active_only=False) if _table_exists("coach_memories") else [],
+        "coach_analyses": get_analyses(limit=1000) if _table_exists("coach_analyses") else [],
     }
 
 
@@ -212,3 +223,137 @@ def database_label() -> str:
 def database_path() -> str:
     """Backward-compatible label retained for RAC v0.1 code."""
     return database_label()
+
+# -----------------------------------------------------------------------------
+# RAC v0.3 — Memoria seleccionada y análisis IA
+# -----------------------------------------------------------------------------
+
+def get_activity(activity_id: int) -> dict[str, Any] | None:
+    rows = (
+        client()
+        .table("activities")
+        .select("*, shoes(nickname)")
+        .eq("id", int(activity_id))
+        .limit(1)
+        .execute()
+        .data
+        or []
+    )
+    return _flatten_activity(rows[0]) if rows else None
+
+
+def get_memories(
+    *, active_only: bool = True, limit: int | None = None
+) -> list[dict[str, Any]]:
+    request = client().table("coach_memories").select("*")
+    if active_only:
+        request = request.eq("active", True)
+    request = request.order("importance", desc=True).order("updated_at", desc=True)
+    if limit is not None:
+        request = request.limit(limit)
+    return list(request.execute().data or [])
+
+
+def add_memory(data: dict[str, Any]) -> int:
+    payload = {
+        "category": data["category"],
+        "title": data["title"].strip(),
+        "content": data["content"].strip(),
+        "importance": int(data.get("importance", 3)),
+        "active": bool(data.get("active", True)),
+        "source": data.get("source", "manual"),
+        "updated_at": datetime.now(timezone.utc).isoformat(),
+    }
+    response = client().table("coach_memories").insert(payload).execute()
+    if not response.data:
+        raise RuntimeError("Supabase no devolvió la memoria guardada.")
+    return int(response.data[0]["id"])
+
+
+def set_memory_active(memory_id: int, active: bool) -> None:
+    (
+        client()
+        .table("coach_memories")
+        .update(
+            {
+                "active": bool(active),
+                "updated_at": datetime.now(timezone.utc).isoformat(),
+            }
+        )
+        .eq("id", int(memory_id))
+        .execute()
+    )
+
+
+def delete_memory(memory_id: int) -> None:
+    client().table("coach_memories").delete().eq("id", int(memory_id)).execute()
+
+
+def get_analysis_by_hash(input_hash: str) -> dict[str, Any] | None:
+    rows = (
+        client()
+        .table("coach_analyses")
+        .select("*")
+        .eq("input_hash", input_hash)
+        .limit(1)
+        .execute()
+        .data
+        or []
+    )
+    return rows[0] if rows else None
+
+
+def save_analysis(data: dict[str, Any]) -> int:
+    payload = {
+        "analysis_type": data["analysis_type"],
+        "reference_key": data["reference_key"],
+        "input_hash": data["input_hash"],
+        "request_text": data.get("request_text", ""),
+        "activity_id": data.get("activity_id"),
+        "period_start": data.get("period_start"),
+        "period_end": data.get("period_end"),
+        "response_json": data["response_json"],
+        "model": data["model"],
+        "prompt_version": data["prompt_version"],
+        "input_tokens": data.get("input_tokens"),
+        "output_tokens": data.get("output_tokens"),
+    }
+    response = (
+        client()
+        .table("coach_analyses")
+        .upsert(payload, on_conflict="input_hash")
+        .execute()
+    )
+    if not response.data:
+        raise RuntimeError("Supabase no devolvió el análisis guardado.")
+    return int(response.data[0]["id"])
+
+
+def get_analyses(limit: int = 20) -> list[dict[str, Any]]:
+    return list(
+        client()
+        .table("coach_analyses")
+        .select("*")
+        .order("created_at", desc=True)
+        .limit(limit)
+        .execute()
+        .data
+        or []
+    )
+
+
+def get_usage_totals() -> dict[str, int]:
+    rows = (
+        client()
+        .table("coach_analyses")
+        .select("input_tokens,output_tokens")
+        .execute()
+        .data
+        or []
+    )
+    return {
+        "input_tokens": sum(int(r.get("input_tokens") or 0) for r in rows),
+        "output_tokens": sum(int(r.get("output_tokens") or 0) for r in rows),
+        "calls": len(rows),
+    }
+

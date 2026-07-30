@@ -43,7 +43,7 @@ if latest:
     a1, a2, a3, a4 = st.columns(4)
     a1.metric("Fecha", activity["activity_date"])
     a2.metric("Distancia", f'{float(activity["distance_km"]):.2f} km')
-    a3.metric("Ritmo", pace_text(activity["distance_km"], activity["duration_min"]))
+    a3.metric("Ritmo", pace_text(activity["distance_km"], activity["duration_min"]).replace(" min/km", ""), help="min/km")
     a4.metric("Esfuerzo", f'{activity["rpe"]}/10')
     st.write(
         f'**Superficie:** {activity["surface"]} · '

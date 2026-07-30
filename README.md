@@ -1,35 +1,29 @@
-# RAC — Running App Coach v0.1
+# RAC — Running App Coach v0.3
 
-Primera versión funcional del proyecto personal de running de Martín.
+RAC es una aplicación personal de running construida con Streamlit, Supabase y un coach IA opcional.
 
-## Incluye
+## v0.3
 
-- Registro manual de entrenamientos.
-- Selección y kilometraje de zapatillas.
-- Botones separados para Sick Day, Día de estudio y descanso.
-- Dashboard semanal.
-- Reporte semanal determinista.
-- Perfil/memoria estable de RAC.
-- Exportación JSON y CSV.
+- Perfil estructurado y editable.
+- Memorias seleccionadas, con activación/desactivación manual.
+- Coach IA para entrenamiento, semana y preguntas.
+- Contexto compacto: perfil + memorias activas + últimos 14 días.
+- Caché en Supabase: si los datos no cambian, reutiliza el análisis y no cobra otra llamada.
+- No guarda prompts completos ni conversaciones infinitas.
+- La API se llama con `store=False`; la memoria oficial vive en Supabase.
+- Seguimiento de tokens acumulados.
 
-## Ejecutar localmente
+## Orden de instalación
 
-```bash
-python -m venv .venv
-# Windows:
-.venv\Scripts\activate
-pip install -r requirements.txt
-streamlit run app.py
+1. Ejecutar `supabase_v0_3.sql` en Supabase SQL Editor.
+2. Subir los archivos al repositorio RAC.
+3. Mantener los secretos Supabase existentes.
+4. Agregar en Streamlit Secrets:
+
+```toml
+[openai]
+api_key = "TU_API_KEY"
+model = "gpt-5-mini"
 ```
 
-## Importante sobre los datos
-
-Esta versión usa Supabase PostgreSQL local para validar la app rápidamente. En Streamlit Community Cloud el almacenamiento local no tiene persistencia garantizada. La siguiente etapa será conectar Supabase y mantener Supabase PostgreSQL solo para desarrollo/pruebas.
-
-## Próximas etapas
-
-1. Base persistente Supabase.
-2. Importación de Adidas Running / Mi Fitness (.GPX, .JSON, .CSV o .FIT según exportación).
-3. Sincronización resumida con LagartijApp.
-4. Coach IA con memoria compacta y salida estructurada.
-5. Reporte semanal generado por RAC.
+La clave nunca debe subirse a GitHub.

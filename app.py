@@ -17,9 +17,9 @@ except Exception as exc:
     st.stop()
 
 st.sidebar.title("🏃 RAC")
-st.sidebar.caption("Running App Coach · v0.2.1")
+st.sidebar.caption("Running App Coach · v0.3")
 st.sidebar.success(
-    "Base persistente conectada. Entrenamientos, contexto, zapatillas y perfil se guardan en Supabase."
+    "Supabase activo. RAC guarda datos, perfil, memorias seleccionadas y análisis estructurados."
 )
 
 pages = {
@@ -27,13 +27,15 @@ pages = {
         st.Page("ui/dashboard.py", title="Inicio", icon="🏠", default=True),
         st.Page("ui/register_run.py", title="Registrar entrenamiento", icon="➕"),
         st.Page("ui/context_day.py", title="Sick / estudio / descanso", icon="🧠"),
+        st.Page("ui/coach.py", title="Coach IA", icon="🤖"),
     ],
     "Seguimiento": [
         st.Page("ui/weekly_report.py", title="Reporte semanal", icon="📊"),
         st.Page("ui/shoes.py", title="Zapatillas", icon="👟"),
         st.Page("ui/history.py", title="Historial", icon="🗓️"),
     ],
-    "Configuración": [
+    "Memoria y configuración": [
+        st.Page("ui/memory.py", title="Memoria RAC", icon="🧠"),
         st.Page("ui/profile.py", title="Perfil RAC", icon="⚙️"),
         st.Page("ui/backup.py", title="Respaldo", icon="💾"),
     ],
