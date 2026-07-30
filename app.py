@@ -17,7 +17,7 @@ except Exception as exc:
     st.stop()
 
 st.sidebar.title("🏃 RAC")
-st.sidebar.caption("Running App Coach · v0.2")
+st.sidebar.caption("Running App Coach · v0.2.1")
 st.sidebar.success(
     "Base persistente conectada. Entrenamientos, contexto, zapatillas y perfil se guardan en Supabase."
 )
