@@ -1,9 +1,7 @@
-from datetime import datetime
-
 import pandas as pd
 import streamlit as st
 
-from rac_core.db import execute, get_shoes
+from rac_core.db import add_shoe, get_shoes
 from rac_core.ui_helpers import page_header
 
 page_header("Zapatillas", "RAC registra uso, contexto y kilometraje acumulado.")
@@ -41,14 +39,17 @@ if submitted:
         st.error("Marca, modelo y apodo son obligatorios.")
     else:
         try:
-            execute(
-                """
-                INSERT INTO shoes (brand, model, nickname, use_context, initial_km, active, created_at)
-                VALUES (?, ?, ?, ?, ?, 1, ?)
-                """,
-                (brand.strip(), model.strip(), nickname.strip(), use_context.strip(), initial_km,
-                 datetime.now().isoformat(timespec="seconds")),
+            add_shoe(
+                {
+                    "brand": brand.strip(),
+                    "model": model.strip(),
+                    "nickname": nickname.strip(),
+                    "use_context": use_context.strip(),
+                    "initial_km": float(initial_km),
+                    "active": True,
+                }
             )
-            st.success("Zapatilla agregada. Recarga la página para verla en la tabla.")
+            st.success("Zapatilla agregada.")
+            st.rerun()
         except Exception as exc:
             st.error(f"No se pudo agregar: {exc}")

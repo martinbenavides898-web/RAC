@@ -1,10 +1,6 @@
-from pathlib import Path
-
 import streamlit as st
 
 from rac_core.db import init_db
-
-APP_DIR = Path(__file__).resolve().parent
 
 st.set_page_config(
     page_title="RAC — Running App Coach",
@@ -13,13 +9,17 @@ st.set_page_config(
     initial_sidebar_state="expanded",
 )
 
-init_db()
+try:
+    init_db()
+except Exception as exc:
+    st.error("RAC no pudo conectarse a Supabase.")
+    st.exception(exc)
+    st.stop()
 
 st.sidebar.title("🏃 RAC")
-st.sidebar.caption("Running App Coach · v0.1")
-st.sidebar.info(
-    "Versión inicial: registro, contexto, zapatillas y reporte semanal. "
-    "La integración con IA y una base persistente vendrán en las siguientes etapas."
+st.sidebar.caption("Running App Coach · v0.2")
+st.sidebar.success(
+    "Base persistente conectada. Entrenamientos, contexto, zapatillas y perfil se guardan en Supabase."
 )
 
 pages = {

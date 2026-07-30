@@ -1,30 +1,17 @@
 from datetime import date
 
-import pandas as pd
 import streamlit as st
 
-from rac_core.db import query
+from rac_core.db import get_activities, get_context_events
 from rac_core.metrics import pace_text, week_bounds
-from rac_core.ui_helpers import local_storage_warning, page_header
+from rac_core.ui_helpers import page_header, persistence_status
 
 page_header("Inicio", "Tu estado actual, sin adornos ni métricas por rellenar.")
-local_storage_warning()
+persistence_status()
 
 start, end = week_bounds(date.today())
-activities = query(
-    """
-    SELECT a.*, s.nickname AS shoe_name
-    FROM activities a
-    LEFT JOIN shoes s ON s.id = a.shoe_id
-    WHERE activity_date BETWEEN ? AND ?
-    ORDER BY activity_date, activity_time
-    """,
-    (start.isoformat(), end.isoformat()),
-)
-events = query(
-    "SELECT * FROM context_events WHERE event_date BETWEEN ? AND ? ORDER BY event_date",
-    (start.isoformat(), end.isoformat()),
-)
+activities = get_activities(start.isoformat(), end.isoformat())
+events = get_context_events(start.isoformat(), end.isoformat())
 
 sessions = len(activities)
 distance = sum(float(a["distance_km"]) for a in activities)
@@ -50,20 +37,12 @@ plan_cols[1].info("**Miércoles · 16:00**\n\nCinta o natación · máximo 60 mi
 plan_cols[2].info("**Sábado · 08:00**\n\nCalle, parque o maicillo\n\nFondo cómodo")
 
 st.subheader("Último entrenamiento")
-latest = query(
-    """
-    SELECT a.*, s.nickname AS shoe_name
-    FROM activities a
-    LEFT JOIN shoes s ON s.id = a.shoe_id
-    ORDER BY activity_date DESC, activity_time DESC, a.id DESC
-    LIMIT 1
-    """
-)
+latest = get_activities(descending=True, limit=1)
 if latest:
     activity = latest[0]
     a1, a2, a3, a4 = st.columns(4)
     a1.metric("Fecha", activity["activity_date"])
-    a2.metric("Distancia", f'{activity["distance_km"]:.2f} km')
+    a2.metric("Distancia", f'{float(activity["distance_km"]):.2f} km')
     a3.metric("Ritmo", pace_text(activity["distance_km"], activity["duration_min"]))
     a4.metric("Esfuerzo", f'{activity["rpe"]}/10')
     st.write(

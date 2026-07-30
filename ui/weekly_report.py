@@ -3,7 +3,7 @@ from datetime import date
 import pandas as pd
 import streamlit as st
 
-from rac_core.db import query
+from rac_core.db import get_activities, get_context_events
 from rac_core.metrics import pace_text, week_bounds, weekly_verdict
 from rac_core.ui_helpers import page_header
 
@@ -12,19 +12,8 @@ page_header("Reporte semanal", "La primera versión usa reglas objetivas; luego 
 period = st.radio("Semana", ["Semana actual", "Semana pasada"], horizontal=True)
 start, end = week_bounds(date.today(), previous=period == "Semana pasada")
 
-activities = query(
-    """
-    SELECT a.*, s.nickname AS shoe_name
-    FROM activities a LEFT JOIN shoes s ON s.id = a.shoe_id
-    WHERE activity_date BETWEEN ? AND ?
-    ORDER BY activity_date, activity_time
-    """,
-    (start.isoformat(), end.isoformat()),
-)
-events = query(
-    "SELECT * FROM context_events WHERE event_date BETWEEN ? AND ? ORDER BY event_date",
-    (start.isoformat(), end.isoformat()),
-)
+activities = get_activities(start.isoformat(), end.isoformat())
+events = get_context_events(start.isoformat(), end.isoformat())
 
 st.subheader(f"{start.strftime('%d-%m-%Y')} al {end.strftime('%d-%m-%Y')}")
 

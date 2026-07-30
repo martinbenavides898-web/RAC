@@ -1,19 +1,13 @@
 import pandas as pd
 import streamlit as st
 
-from rac_core.db import delete_activity, query
+from rac_core.db import delete_activity, get_activities, get_context_events
 from rac_core.metrics import pace_text
 from rac_core.ui_helpers import page_header
 
 page_header("Historial", "Entrenamientos y contexto en orden cronológico.")
 
-activities = query(
-    """
-    SELECT a.*, s.nickname AS shoe_name
-    FROM activities a LEFT JOIN shoes s ON s.id = a.shoe_id
-    ORDER BY activity_date DESC, activity_time DESC, a.id DESC
-    """
-)
+activities = get_activities(descending=True)
 
 if not activities:
     st.info("No hay entrenamientos todavía.")
@@ -37,10 +31,11 @@ else:
         confirm = st.checkbox("Confirmo que quiero eliminarlo")
         if st.button("Eliminar", disabled=not confirm):
             delete_activity(int(activity_id))
-            st.success("Registro eliminado. Recarga la página.")
+            st.success("Registro eliminado.")
+            st.rerun()
 
 st.subheader("Eventos de contexto")
-events = query("SELECT * FROM context_events ORDER BY event_date DESC, id DESC")
+events = get_context_events(descending=True)
 if events:
     st.dataframe(pd.DataFrame(events), hide_index=True, use_container_width=True)
 else:

@@ -1,240 +1,219 @@
 from __future__ import annotations
 
-import json
-import os
-import sqlite3
-from contextlib import contextmanager
-from datetime import date, datetime
-from pathlib import Path
-from typing import Any, Iterator
+import re
+from datetime import datetime, timezone
+from typing import Any
 
-APP_DIR = Path(__file__).resolve().parents[1]
-DEFAULT_DB_PATH = APP_DIR / "data" / "rac.db"
-DB_PATH = Path(os.getenv("RAC_DB_PATH", str(DEFAULT_DB_PATH)))
+import streamlit as st
+from supabase import Client, create_client
 
 
-@contextmanager
-def connection() -> Iterator[sqlite3.Connection]:
-    DB_PATH.parent.mkdir(parents=True, exist_ok=True)
-    conn = sqlite3.connect(DB_PATH)
-    conn.row_factory = sqlite3.Row
-    conn.execute("PRAGMA foreign_keys = ON")
+@st.cache_resource
+def client() -> Client:
+    """Create one server-side Supabase client for the Streamlit process."""
     try:
-        yield conn
-        conn.commit()
-    finally:
-        conn.close()
+        config = st.secrets["supabase"]
+        url = str(config["url"]).strip()
+        key = str(config["key"]).strip()
+    except (KeyError, FileNotFoundError) as exc:
+        raise RuntimeError(
+            "Faltan los secretos de Supabase. Configura [supabase] url y key en Streamlit Secrets."
+        ) from exc
+
+    if not url or not key:
+        raise RuntimeError("La URL o la clave de Supabase están vacías.")
+
+    return create_client(url, key)
 
 
 def init_db() -> None:
-    with connection() as conn:
-        conn.executescript(
-            """
-            CREATE TABLE IF NOT EXISTS shoes (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                brand TEXT NOT NULL,
-                model TEXT NOT NULL,
-                nickname TEXT NOT NULL UNIQUE,
-                use_context TEXT NOT NULL DEFAULT '',
-                initial_km REAL NOT NULL DEFAULT 0,
-                active INTEGER NOT NULL DEFAULT 1,
-                created_at TEXT NOT NULL
-            );
-
-            CREATE TABLE IF NOT EXISTS activities (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                activity_date TEXT NOT NULL,
-                activity_time TEXT,
-                activity_type TEXT NOT NULL,
-                surface TEXT NOT NULL,
-                distance_km REAL NOT NULL,
-                duration_min REAL NOT NULL,
-                avg_hr INTEGER,
-                max_hr INTEGER,
-                elevation_gain_m REAL,
-                cadence_spm REAL,
-                rpe INTEGER NOT NULL,
-                pain_before INTEGER NOT NULL,
-                pain_during INTEGER NOT NULL,
-                pain_after INTEGER NOT NULL,
-                pain_location TEXT NOT NULL DEFAULT '',
-                shoe_id INTEGER,
-                planned_status TEXT NOT NULL,
-                notes TEXT NOT NULL DEFAULT '',
-                created_at TEXT NOT NULL,
-                FOREIGN KEY (shoe_id) REFERENCES shoes(id)
-            );
-
-            CREATE TABLE IF NOT EXISTS context_events (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                event_date TEXT NOT NULL,
-                event_type TEXT NOT NULL,
-                planned_training INTEGER NOT NULL DEFAULT 0,
-                sleep_hours REAL,
-                severity INTEGER,
-                stress INTEGER,
-                study_hours REAL,
-                symptoms TEXT NOT NULL DEFAULT '',
-                notes TEXT NOT NULL DEFAULT '',
-                created_at TEXT NOT NULL
-            );
-
-            CREATE TABLE IF NOT EXISTS strength_logs (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                log_date TEXT NOT NULL UNIQUE,
-                completed INTEGER NOT NULL DEFAULT 0,
-                leg_load TEXT NOT NULL DEFAULT 'Ninguna',
-                duration_min REAL,
-                rpe INTEGER,
-                pain_after INTEGER,
-                source TEXT NOT NULL DEFAULT 'LagartijApp',
-                notes TEXT NOT NULL DEFAULT '',
-                created_at TEXT NOT NULL
-            );
-
-            CREATE TABLE IF NOT EXISTS profile (
-                key TEXT PRIMARY KEY,
-                value_json TEXT NOT NULL,
-                updated_at TEXT NOT NULL
-            );
-            """
-        )
-        _seed_shoes(conn)
-        _seed_profile(conn)
+    """Fail early with a clear error if Supabase is not reachable or configured."""
+    client().table("profile").select("key").limit(1).execute()
 
 
-def _seed_shoes(conn: sqlite3.Connection) -> None:
-    now = datetime.now().isoformat(timespec="seconds")
-    defaults = [
-        ("Brooks", "Ghost 16", "Ghost antiguas", "Universidad y cinta", 252.0, 1, now),
-        ("ASICS", "Superblast 2 Tokyo", "Superblast", "Calle, parque, maicillo y fondos", 0.0, 1, now),
-    ]
-    conn.executemany(
-        """
-        INSERT OR IGNORE INTO shoes
-        (brand, model, nickname, use_context, initial_km, active, created_at)
-        VALUES (?, ?, ?, ?, ?, ?, ?)
-        """,
-        defaults,
-    )
+def _flatten_activity(row: dict[str, Any]) -> dict[str, Any]:
+    item = dict(row)
+    shoe = item.pop("shoes", None)
+    item["shoe_name"] = shoe.get("nickname") if isinstance(shoe, dict) else None
+    return item
 
 
-def _seed_profile(conn: sqlite3.Connection) -> None:
-    defaults: dict[str, Any] = {
-        "coach_style": "Objetivo, técnico, tranquilo y motivacional sin exagerar",
-        "primary_goal": "Correr 10 km como un entrenamiento cotidiano, cómodo y recuperable",
-        "endurance_goal": "Completar fondos de más de una hora sin quedar agotado",
-        "pace_goal": "Acercar progresivamente el ritmo cómodo a 5:00–4:40 min/km",
-        "weekly_plan": {
-            "martes": "16:00, cinta, máximo 60 min",
-            "miércoles": "16:00, cinta o natación, máximo 60 min",
-            "sábado": "08:00, calle/parque/maicillo, hasta 120 min disponibles",
-        },
-        "injury_history": [
-            "Periostitis tibial con episodio punzante 5/10",
-            "Dolor lateral de rodilla derecha en enero de 2026, actualmente asintomático",
-            "Molestia soportable de tobillos ocasional después de 10 km",
-        ],
-        "coach_rule": (
-            "Reconocer el progreso, pero no transformar una sesión buena en permiso "
-            "automático para aumentar mucho la carga."
-        ),
-    }
-    now = datetime.now().isoformat(timespec="seconds")
-    for key, value in defaults.items():
-        conn.execute(
-            "INSERT OR IGNORE INTO profile (key, value_json, updated_at) VALUES (?, ?, ?)",
-            (key, json.dumps(value, ensure_ascii=False), now),
-        )
+def _activities(
+    start_date: str | None = None,
+    end_date: str | None = None,
+    *,
+    descending: bool = False,
+    limit: int | None = None,
+) -> list[dict[str, Any]]:
+    request = client().table("activities").select("*, shoes(nickname)")
+    if start_date:
+        request = request.gte("activity_date", start_date)
+    if end_date:
+        request = request.lte("activity_date", end_date)
+    request = request.order("activity_date", desc=descending).order(
+        "activity_time", desc=descending
+    ).order("id", desc=descending)
+    if limit is not None:
+        request = request.limit(limit)
+    response = request.execute()
+    return [_flatten_activity(row) for row in (response.data or [])]
+
+
+def _events(
+    start_date: str | None = None,
+    end_date: str | None = None,
+    *,
+    descending: bool = False,
+) -> list[dict[str, Any]]:
+    request = client().table("context_events").select("*")
+    if start_date:
+        request = request.gte("event_date", start_date)
+    if end_date:
+        request = request.lte("event_date", end_date)
+    response = request.order("event_date", desc=descending).order(
+        "id", desc=descending
+    ).execute()
+    return list(response.data or [])
 
 
 def query(sql: str, params: tuple[Any, ...] = ()) -> list[dict[str, Any]]:
-    with connection() as conn:
-        rows = conn.execute(sql, params).fetchall()
-    return [dict(row) for row in rows]
+    """Compatibility layer for the small set of reads used by RAC v0.1 pages."""
+    normalized = re.sub(r"\s+", " ", sql.strip().lower())
+
+    if "from activities a" in normalized:
+        has_range = "activity_date between ? and ?" in normalized
+        descending = "order by activity_date desc" in normalized
+        limit = 1 if "limit 1" in normalized else None
+        start = str(params[0]) if has_range else None
+        end = str(params[1]) if has_range else None
+        return _activities(start, end, descending=descending, limit=limit)
+
+    if normalized.startswith("select * from activities"):
+        return _activities(descending="desc" in normalized)
+
+    if "from context_events" in normalized:
+        has_range = "event_date between ? and ?" in normalized
+        start = str(params[0]) if has_range else None
+        end = str(params[1]) if has_range else None
+        return _events(start, end, descending="desc" in normalized)
+
+    if normalized.startswith("select * from shoes"):
+        return list(client().table("shoes").select("*").order("id").execute().data or [])
+
+    if normalized.startswith("select * from profile"):
+        return list(client().table("profile").select("*").order("key").execute().data or [])
+
+    raise ValueError(f"Consulta no soportada por la capa Supabase de RAC: {normalized}")
 
 
 def execute(sql: str, params: tuple[Any, ...] = ()) -> int:
-    with connection() as conn:
-        cursor = conn.execute(sql, params)
-        return int(cursor.lastrowid or 0)
+    """Compatibility layer for the one generic write used by the shoes page."""
+    normalized = re.sub(r"\s+", " ", sql.strip().lower())
+    if normalized.startswith("insert into shoes"):
+        brand, model, nickname, use_context, initial_km, _created_at = params
+        response = client().table("shoes").insert(
+            {
+                "brand": brand,
+                "model": model,
+                "nickname": nickname,
+                "use_context": use_context,
+                "initial_km": float(initial_km),
+                "active": True,
+            }
+        ).execute()
+        if not response.data:
+            raise RuntimeError("Supabase no devolvió la zapatilla guardada.")
+        return int(response.data[0]["id"])
+
+    raise ValueError(f"Escritura no soportada por la capa Supabase de RAC: {normalized}")
 
 
 def get_shoes(active_only: bool = True) -> list[dict[str, Any]]:
-    where = "WHERE active = 1" if active_only else ""
-    return query(
-        f"""
-        SELECT s.*,
-               s.initial_km + COALESCE(SUM(a.distance_km), 0) AS total_km
-        FROM shoes s
-        LEFT JOIN activities a ON a.shoe_id = s.id
-        {where}
-        GROUP BY s.id
-        ORDER BY s.active DESC, s.nickname
-        """
-    )
+    request = client().table("shoes").select("*")
+    if active_only:
+        request = request.eq("active", True)
+    shoes = list(request.order("active", desc=True).order("nickname").execute().data or [])
+
+    activities = client().table("activities").select("shoe_id,distance_km").execute().data or []
+    totals: dict[int, float] = {}
+    for activity in activities:
+        shoe_id = activity.get("shoe_id")
+        if shoe_id is not None:
+            totals[int(shoe_id)] = totals.get(int(shoe_id), 0.0) + float(
+                activity.get("distance_km") or 0
+            )
+
+    for shoe in shoes:
+        shoe["total_km"] = float(shoe.get("initial_km") or 0) + totals.get(
+            int(shoe["id"]), 0.0
+        )
+    return shoes
 
 
 def add_activity(data: dict[str, Any]) -> int:
-    return execute(
-        """
-        INSERT INTO activities (
-            activity_date, activity_time, activity_type, surface,
-            distance_km, duration_min, avg_hr, max_hr, elevation_gain_m,
-            cadence_spm, rpe, pain_before, pain_during, pain_after,
-            pain_location, shoe_id, planned_status, notes, created_at
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-        """,
-        (
-            data["activity_date"], data.get("activity_time"), data["activity_type"],
-            data["surface"], data["distance_km"], data["duration_min"],
-            data.get("avg_hr"), data.get("max_hr"), data.get("elevation_gain_m"),
-            data.get("cadence_spm"), data["rpe"], data["pain_before"],
-            data["pain_during"], data["pain_after"], data.get("pain_location", ""),
-            data.get("shoe_id"), data["planned_status"], data.get("notes", ""),
-            datetime.now().isoformat(timespec="seconds"),
-        ),
-    )
+    payload = {
+        "activity_date": data["activity_date"],
+        "activity_time": data.get("activity_time"),
+        "activity_type": data["activity_type"],
+        "surface": data["surface"],
+        "distance_km": data["distance_km"],
+        "duration_min": data["duration_min"],
+        "avg_hr": data.get("avg_hr"),
+        "max_hr": data.get("max_hr"),
+        "elevation_gain_m": data.get("elevation_gain_m"),
+        "cadence_spm": data.get("cadence_spm"),
+        "rpe": data["rpe"],
+        "pain_before": data["pain_before"],
+        "pain_during": data["pain_during"],
+        "pain_after": data["pain_after"],
+        "pain_location": data.get("pain_location", ""),
+        "shoe_id": data.get("shoe_id"),
+        "planned_status": data["planned_status"],
+        "notes": data.get("notes", ""),
+    }
+    response = client().table("activities").insert(payload).execute()
+    if not response.data:
+        raise RuntimeError("Supabase no devolvió el entrenamiento guardado.")
+    return int(response.data[0]["id"])
 
 
 def add_context_event(data: dict[str, Any]) -> int:
-    return execute(
-        """
-        INSERT INTO context_events (
-            event_date, event_type, planned_training, sleep_hours,
-            severity, stress, study_hours, symptoms, notes, created_at
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-        """,
-        (
-            data["event_date"], data["event_type"], int(data.get("planned_training", False)),
-            data.get("sleep_hours"), data.get("severity"), data.get("stress"),
-            data.get("study_hours"), data.get("symptoms", ""), data.get("notes", ""),
-            datetime.now().isoformat(timespec="seconds"),
-        ),
-    )
+    payload = {
+        "event_date": data["event_date"],
+        "event_type": data["event_type"],
+        "planned_training": bool(data.get("planned_training", False)),
+        "sleep_hours": data.get("sleep_hours"),
+        "severity": data.get("severity"),
+        "stress": data.get("stress"),
+        "study_hours": data.get("study_hours"),
+        "symptoms": data.get("symptoms", ""),
+        "notes": data.get("notes", ""),
+    }
+    response = client().table("context_events").insert(payload).execute()
+    if not response.data:
+        raise RuntimeError("Supabase no devolvió el evento guardado.")
+    return int(response.data[0]["id"])
 
 
 def get_profile() -> dict[str, Any]:
-    rows = query("SELECT key, value_json FROM profile")
-    return {row["key"]: json.loads(row["value_json"]) for row in rows}
+    rows = client().table("profile").select("key,value_json").execute().data or []
+    return {row["key"]: row["value_json"] for row in rows}
 
 
 def set_profile_value(key: str, value: Any) -> None:
-    now = datetime.now().isoformat(timespec="seconds")
-    with connection() as conn:
-        conn.execute(
-            """
-            INSERT INTO profile (key, value_json, updated_at)
-            VALUES (?, ?, ?)
-            ON CONFLICT(key) DO UPDATE SET value_json=excluded.value_json, updated_at=excluded.updated_at
-            """,
-            (key, json.dumps(value, ensure_ascii=False), now),
-        )
+    client().table("profile").upsert(
+        {
+            "key": key,
+            "value_json": value,
+            "updated_at": datetime.now(timezone.utc).isoformat(),
+        },
+        on_conflict="key",
+    ).execute()
 
 
 def delete_activity(activity_id: int) -> None:
-    execute("DELETE FROM activities WHERE id = ?", (activity_id,))
+    client().table("activities").delete().eq("id", activity_id).execute()
 
 
-def database_path() -> Path:
-    return DB_PATH
+def database_path() -> str:
+    return "Supabase PostgreSQL · persistencia activa"

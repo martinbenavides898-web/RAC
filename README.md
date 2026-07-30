@@ -24,7 +24,7 @@ streamlit run app.py
 
 ## Importante sobre los datos
 
-Esta versión usa SQLite local para validar la app rápidamente. En Streamlit Community Cloud el almacenamiento local no tiene persistencia garantizada. La siguiente etapa será conectar Supabase y mantener SQLite solo para desarrollo/pruebas.
+Esta versión usa Supabase PostgreSQL local para validar la app rápidamente. En Streamlit Community Cloud el almacenamiento local no tiene persistencia garantizada. La siguiente etapa será conectar Supabase y mantener Supabase PostgreSQL solo para desarrollo/pruebas.
 
 ## Próximas etapas
 
