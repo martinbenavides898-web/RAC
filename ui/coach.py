@@ -22,7 +22,7 @@ available, detail = coach_available()
 if not available:
     st.warning("El coach todavía no tiene una clave de Gemini configurada.")
     st.code(
-        '[gemini]\napi_key = "PEGA_AQUI_TU_CLAVE"\nmodel = "gemini-2.5-flash-lite"',
+        '[gemini]\napi_key = "PEGA_AQUI_TU_CLAVE"\nmodel = "gemini-3.1-flash-lite"',
         language="toml",
     )
     st.caption(detail)
@@ -148,7 +148,8 @@ with run_tab:
                 except Exception as exc:
                     st.error(f"No se pudo generar el análisis: {exc}")
         if "coach_result_run" in st.session_state:
-            render_analysis(*st.session_state["coach_result_run"])
+            result, label = st.session_state["coach_result_run"]
+            render_analysis(result, cache_label=label)
 
 with week_tab:
     period = st.radio("Periodo", ["Semana actual", "Semana pasada"], horizontal=True)
@@ -175,7 +176,8 @@ with week_tab:
             except Exception as exc:
                 st.error(f"No se pudo generar el reporte: {exc}")
     if "coach_result_week" in st.session_state:
-        render_analysis(*st.session_state["coach_result_week"])
+        result, label = st.session_state["coach_result_week"]
+        render_analysis(result, cache_label=label)
 
 with ask_tab:
     question = st.text_area(
@@ -200,4 +202,5 @@ with ask_tab:
                 except Exception as exc:
                     st.error(f"No se pudo responder: {exc}")
     if "coach_result_question" in st.session_state:
-        render_analysis(*st.session_state["coach_result_question"])
+        result, label = st.session_state["coach_result_question"]
+        render_analysis(result, cache_label=label)

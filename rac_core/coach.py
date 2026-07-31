@@ -10,7 +10,7 @@ from google.genai import types
 from rac_core.coach_models import CoachAnalysis
 from rac_core.memory import PROMPT_VERSION
 
-DEFAULT_MODEL = "gemini-2.5-flash-lite"
+DEFAULT_MODEL = "gemini-3.1-flash-lite"
 
 SYSTEM_INSTRUCTIONS = """
 Eres RAC, el coach personal de running de Martín.

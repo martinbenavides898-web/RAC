@@ -17,7 +17,7 @@ except Exception as exc:
     st.stop()
 
 st.sidebar.title("🏃 RAC")
-st.sidebar.caption("Running App Coach · v0.3.1 · Gemini")
+st.sidebar.caption("Running App Coach · v0.3.2 · Gemini")
 st.sidebar.success(
     "Supabase activo. Gemini es el coach IA; RAC guarda datos, perfil, memorias seleccionadas y análisis estructurados."
 )
