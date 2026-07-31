@@ -1,13 +1,16 @@
 import streamlit as st
 
 from rac_core.db import init_db
+from rac_core.theme import apply_global_theme
 
 st.set_page_config(
-    page_title="RAC — Running App Coach",
+    page_title="RAC — Running Assist Coach",
     page_icon="🏃",
     layout="wide",
-    initial_sidebar_state="expanded",
+    initial_sidebar_state="collapsed",
 )
+
+apply_global_theme()
 
 try:
     init_db()
@@ -16,15 +19,15 @@ except Exception as exc:
     st.exception(exc)
     st.stop()
 
-st.sidebar.title("🏃 RAC")
-st.sidebar.caption("Running App Coach · v0.3.2 · Gemini")
+st.sidebar.markdown('<div class="rac-sidebar-logo">RAC</div>', unsafe_allow_html=True)
+st.sidebar.caption("Running Assist Coach · v0.4 visual · Gemini")
 st.sidebar.success(
-    "Supabase activo. Gemini es el coach IA; RAC guarda datos, perfil, memorias seleccionadas y análisis estructurados."
+    "Supabase activo. Gemini es el coach IA; RAC conserva datos, perfil, memorias y análisis estructurados."
 )
 
 pages = {
     "RAC": [
-        st.Page("ui/dashboard.py", title="Inicio", icon="🏠", default=True),
+        st.Page("ui/dashboard.py", title="Hoy", icon="🏠", default=True),
         st.Page("ui/register_run.py", title="Registrar entrenamiento", icon="➕"),
         st.Page("ui/context_day.py", title="Sick / estudio / descanso", icon="🧠"),
         st.Page("ui/coach.py", title="Coach IA", icon="🤖"),

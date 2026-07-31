@@ -1,62 +1,241 @@
-from datetime import date
+from __future__ import annotations
+
+from datetime import date, datetime
+from zoneinfo import ZoneInfo
 
 import streamlit as st
 
-from rac_core.db import get_activities, get_context_events
-from rac_core.metrics import pace_text, week_bounds
-from rac_core.ui_helpers import page_header, persistence_status
+from rac_core.db import get_activities, get_context_events, get_profile
+from rac_core.metrics import week_bounds
+from rac_core.theme import TOKENS, render_status_grid
+from rac_core.ui_helpers import bottom_navigation
 
-page_header("Inicio", "Tu estado actual, sin adornos ni métricas por rellenar.")
-persistence_status()
 
-start, end = week_bounds(date.today())
-activities = get_activities(start.isoformat(), end.isoformat())
-events = get_context_events(start.isoformat(), end.isoformat())
+WEEKDAY_LABELS = ["L", "M", "M", "J", "V", "S", "D"]
+MONTHS_ES = [
+    "enero", "febrero", "marzo", "abril", "mayo", "junio",
+    "julio", "agosto", "septiembre", "octubre", "noviembre", "diciembre",
+]
+WEEKDAYS_ES = ["lunes", "martes", "miércoles", "jueves", "viernes", "sábado", "domingo"]
 
-sessions = len(activities)
-distance = sum(float(a["distance_km"]) for a in activities)
-duration = sum(float(a["duration_min"]) for a in activities)
-max_pain = max(
-    [
-        max(int(a["pain_before"]), int(a["pain_during"]), int(a["pain_after"]))
-        for a in activities
-    ]
-    or [0]
+
+def _format_duration(total_minutes: float) -> str:
+    minutes = max(0, int(round(total_minutes)))
+    hours, remaining = divmod(minutes, 60)
+    if hours:
+        return f"{hours} h {remaining:02d} min"
+    return f"{remaining} min"
+
+
+def _latest_sleep(events: list[dict], profile: dict) -> float:
+    for event in sorted(events, key=lambda item: item.get("event_date", ""), reverse=True):
+        if event.get("sleep_hours") is not None:
+            return float(event["sleep_hours"])
+    availability = profile.get("availability_profile") or {}
+    return float(availability.get("sleep_reality_hours", 6.0))
+
+
+def _max_recent_pain(activities: list[dict], profile: dict) -> int:
+    values = [int((profile.get("runner_profile") or {}).get("current_pain", 0))]
+    for activity in activities[-3:]:
+        values.extend(
+            [
+                int(activity.get("pain_before") or 0),
+                int(activity.get("pain_during") or 0),
+                int(activity.get("pain_after") or 0),
+            ]
+        )
+    return max(values or [0])
+
+
+def _readiness_copy(*, pain: int, has_sick_day: bool) -> tuple[str, str, int, str, str]:
+    if has_sick_day:
+        return (
+            "Hoy conviene priorizar recuperación y observar cómo evolucionan tus síntomas.",
+            "RECUPERACIÓN",
+            25,
+            "Movilidad suave · sin impacto",
+            "La prioridad de hoy es recuperarte. No hay una sesión pendiente que debas pagar después.",
+        )
+    if pain >= 4:
+        return (
+            "Hoy conviene bajar la carga y revisar las molestias antes de correr.",
+            "RECUPERACIÓN",
+            25,
+            "Movilidad suave · sin impacto",
+            "Hay una señal de dolor relevante. RAC no aumentará distancia ni intensidad hasta ver su evolución.",
+        )
+    return (
+        "Hoy estás en condiciones de hacer un rodaje suave.",
+        "RODAJE SUAVE",
+        40,
+        "Ritmo conversacional · Z2",
+        "Mantén el esfuerzo controlado. Hoy importa acumular minutos, no buscar velocidad.",
+    )
+
+
+now = datetime.now(ZoneInfo("America/Santiago"))
+today = now.date()
+start, end = week_bounds(today)
+
+activities = get_activities(start.isoformat(), end.isoformat(), descending=False)
+events = get_context_events(start.isoformat(), end.isoformat(), descending=False)
+profile = get_profile()
+
+runner = profile.get("runner_profile") or {}
+name = str(runner.get("preferred_name") or "Martín")
+sleep_hours = _latest_sleep(events, profile)
+pain = _max_recent_pain(activities, profile)
+has_sick_day = any(
+    event.get("event_date") == today.isoformat() and event.get("event_type") == "Sick day"
+    for event in events
 )
 
-c1, c2, c3, c4 = st.columns(4)
-c1.metric("Sesiones esta semana", sessions, help="Meta estimada: 3 sesiones")
-c2.metric("Distancia", f"{distance:.1f} km")
-c3.metric("Tiempo corriendo", f"{duration:.0f} min")
-c4.metric("Dolor máximo", f"{max_pain}/10")
+readiness_text, workout_name, workout_minutes, workout_zone, workout_copy = _readiness_copy(
+    pain=pain,
+    has_sick_day=has_sick_day,
+)
 
-st.subheader("Plan semanal base")
-plan_cols = st.columns(3)
-plan_cols[0].info("**Martes · 16:00**\n\nCinta · máximo 60 min\n\nRodaje cómodo")
-plan_cols[1].info("**Miércoles · 16:00**\n\nCinta o natación · máximo 60 min\n\nSesión corta/controlada")
-plan_cols[2].info("**Sábado · 08:00**\n\nCalle, parque o maicillo\n\nFondo cómodo")
-
-st.subheader("Último entrenamiento")
-latest = get_activities(descending=True, limit=1)
-if latest:
-    activity = latest[0]
-    a1, a2, a3, a4 = st.columns(4)
-    a1.metric("Fecha", activity["activity_date"])
-    a2.metric("Distancia", f'{float(activity["distance_km"]):.2f} km')
-    a3.metric("Ritmo", pace_text(activity["distance_km"], activity["duration_min"]).replace(" min/km", ""), help="min/km")
-    a4.metric("Esfuerzo", f'{activity["rpe"]}/10')
-    st.write(
-        f'**Superficie:** {activity["surface"]} · '
-        f'**Zapatillas:** {activity.get("shoe_name") or "Sin registrar"} · '
-        f'**Dolor durante:** {activity["pain_during"]}/10'
-    )
-    if activity["notes"]:
-        st.info(activity["notes"])
+if pain == 0:
+    legs_value = "Normales"
+    discomfort_value = "Ninguna"
+    discomfort_color = TOKENS["green"]
+    discomfort_progress = 100
+elif pain <= 2:
+    legs_value = "Algo cargadas"
+    discomfort_value = "Leves"
+    discomfort_color = TOKENS["cyan"]
+    discomfort_progress = 72
 else:
-    st.info("Todavía no hay entrenamientos registrados. Usa **Registrar entrenamiento**.")
+    legs_value = "Cargadas"
+    discomfort_value = f"{pain}/10"
+    discomfort_color = TOKENS["crimson"]
+    discomfort_progress = 38
 
-if events:
-    st.subheader("Contexto de esta semana")
-    labels = {"Sick day": "🤒", "Día de estudio": "📚", "Descanso": "🛌"}
-    for event in events:
-        st.write(f'{labels.get(event["event_type"], "•")} **{event["event_date"]} — {event["event_type"]}**')
+sleep_progress = int(min(100, max(18, sleep_hours / 8 * 100)))
+
+session_count = len(activities)
+total_distance = sum(float(item.get("distance_km") or 0) for item in activities)
+total_minutes = sum(float(item.get("duration_min") or 0) for item in activities)
+trained_weekdays = {
+    date.fromisoformat(item["activity_date"]).weekday()
+    for item in activities
+    if item.get("activity_date")
+}
+
+if has_sick_day:
+    explanation = (
+        "Registraste un Sick Day. La sesión se reemplaza por recuperación y no genera deuda deportiva. "
+        "La próxima carga se decidirá según tu evolución."
+    )
+elif pain >= 4:
+    explanation = (
+        "RAC detecta una señal de dolor relevante en tus registros recientes. Antes de progresar, "
+        "conviene observar si disminuye y si altera tu forma de caminar o correr."
+    )
+else:
+    explanation = (
+        "Vienes retomando continuidad y tu recuperación está limitada por el sueño. "
+        "La sesión busca sumar volumen sin aumentar innecesariamente la carga de tus piernas."
+    )
+
+st.markdown('<main class="rac-app-shell">', unsafe_allow_html=True)
+
+st.markdown(
+    f"""
+    <section class="rac-topbar">
+        <div>
+            <div class="rac-wordmark">RAC</div>
+            <h1 class="rac-greeting">Buenas {"mañanas" if now.hour < 12 else "tardes" if now.hour < 20 else "noches"}, {name}</h1>
+            <div class="rac-date">{WEEKDAYS_ES[today.weekday()]} {today.day} de {MONTHS_ES[today.month - 1]}</div>
+        </div>
+        <div class="rac-bell" aria-label="Notificaciones">♧</div>
+    </section>
+    <p class="rac-daily-readiness">{readiness_text}</p>
+    """,
+    unsafe_allow_html=True,
+)
+
+render_status_grid(
+    [
+        {
+            "icon": "☾",
+            "label": "Sueño",
+            "value": f"{sleep_hours:g} h",
+            "color": TOKENS["cyan"],
+            "progress": sleep_progress,
+        },
+        {
+            "icon": "◖",
+            "label": "Piernas",
+            "value": legs_value,
+            "color": TOKENS["orange"],
+            "progress": 68 if pain <= 2 else 38,
+        },
+        {
+            "icon": "✓",
+            "label": "Molestias",
+            "value": discomfort_value,
+            "color": discomfort_color,
+            "progress": discomfort_progress,
+        },
+    ]
+)
+
+st.markdown(
+    f"""
+    <section class="rac-workout-card">
+        <div class="rac-workout-eyebrow"><span>🏃</span>{workout_name}</div>
+        <div class="rac-workout-duration">{workout_minutes}<span>min</span></div>
+        <div class="rac-workout-zone">{workout_zone}</div>
+        <p class="rac-workout-copy">{workout_copy}</p>
+    </section>
+    """,
+    unsafe_allow_html=True,
+)
+
+with st.container(key="rac_primary_action"):
+    if st.button("INICIAR ENTRENAMIENTO  ▶", type="primary", use_container_width=True):
+        st.switch_page("ui/register_run.py")
+
+st.markdown(
+    f"""
+    <details class="rac-coach-note" open>
+        <summary>¿Por qué este entrenamiento?</summary>
+        <p>{explanation}</p>
+    </details>
+    """,
+    unsafe_allow_html=True,
+)
+
+week_days_html = "".join(
+    f'<div class="rac-week-day{" is-trained" if idx in trained_weekdays else ""}{" is-today" if idx == today.weekday() else ""}">{label}</div>'
+    for idx, label in enumerate(WEEKDAY_LABELS)
+)
+
+st.markdown(
+    f"""
+    <section class="rac-weekly-card">
+        <div class="rac-weekly-title"><span>▥ Resumen semanal</span><span>›</span></div>
+        <div class="rac-weekly-metrics">
+            <div class="rac-weekly-metric">
+                <div class="rac-weekly-value">{session_count} de 3</div>
+                <div class="rac-weekly-label">sesiones</div>
+            </div>
+            <div class="rac-weekly-metric">
+                <div class="rac-weekly-value">{total_distance:.1f} km</div>
+                <div class="rac-weekly-label">distancia</div>
+            </div>
+            <div class="rac-weekly-metric">
+                <div class="rac-weekly-value">{_format_duration(total_minutes)}</div>
+                <div class="rac-weekly-label">tiempo total</div>
+            </div>
+        </div>
+        <div class="rac-week-strip">{week_days_html}</div>
+    </section>
+    """,
+    unsafe_allow_html=True,
+)
+
+st.markdown("</main>", unsafe_allow_html=True)
+bottom_navigation(active="today")
