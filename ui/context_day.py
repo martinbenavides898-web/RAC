@@ -7,7 +7,7 @@ from rac_core.ui_helpers import page_header
 
 page_header("Contexto del día", "Una sesión omitida no es una deuda deportiva.")
 
-sick_tab, study_tab, rest_tab = st.tabs(["🤒 Sick Day", "📚 Día de estudio", "🛌 Descanso"])
+sick_tab, study_tab, rest_tab = st.tabs(["Sick Day", "Día de estudio", "Descanso"])
 
 with sick_tab:
     with st.form("sick_form"):

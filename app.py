@@ -5,9 +5,8 @@ from rac_core.theme import apply_global_theme
 
 st.set_page_config(
     page_title="RAC — Running Assist Coach",
-    page_icon="🏃",
     layout="wide",
-    initial_sidebar_state="collapsed",
+    initial_sidebar_state="expanded",
 )
 
 apply_global_theme()
@@ -19,28 +18,35 @@ except Exception as exc:
     st.exception(exc)
     st.stop()
 
-st.sidebar.markdown('<div class="rac-sidebar-logo">RAC</div>', unsafe_allow_html=True)
-st.sidebar.caption("Running Assist Coach · v0.4 visual · Gemini")
-st.sidebar.success(
-    "Supabase activo. Gemini es el coach IA; RAC conserva datos, perfil, memorias y análisis estructurados."
+st.sidebar.markdown(
+    """
+    <div class="rac-sidebar-meta">
+        <div class="rac-sidebar-footer-logo">RAC</div>
+        <div class="rac-sidebar-version">Running Assist Coach · v0.4.1 visual · Gemini</div>
+        <div class="rac-sidebar-status">
+            Supabase activo. Gemini es el coach IA; RAC conserva datos, perfil, memorias y análisis estructurados.
+        </div>
+    </div>
+    """,
+    unsafe_allow_html=True,
 )
 
 pages = {
     "RAC": [
-        st.Page("ui/dashboard.py", title="Hoy", icon="🏠", default=True),
-        st.Page("ui/register_run.py", title="Registrar entrenamiento", icon="➕"),
-        st.Page("ui/context_day.py", title="Sick / estudio / descanso", icon="🧠"),
-        st.Page("ui/coach.py", title="Coach IA", icon="🤖"),
+        st.Page("ui/dashboard.py", title="Hoy", default=True),
+        st.Page("ui/register_run.py", title="Registrar entrenamiento"),
+        st.Page("ui/context_day.py", title="Sick / estudio / descanso"),
+        st.Page("ui/coach.py", title="Coach IA"),
     ],
     "Seguimiento": [
-        st.Page("ui/weekly_report.py", title="Reporte semanal", icon="📊"),
-        st.Page("ui/shoes.py", title="Zapatillas", icon="👟"),
-        st.Page("ui/history.py", title="Historial", icon="🗓️"),
+        st.Page("ui/weekly_report.py", title="Reporte semanal"),
+        st.Page("ui/shoes.py", title="Zapatillas"),
+        st.Page("ui/history.py", title="Historial"),
     ],
     "Memoria y configuración": [
-        st.Page("ui/memory.py", title="Memoria RAC", icon="🧠"),
-        st.Page("ui/profile.py", title="Perfil RAC", icon="⚙️"),
-        st.Page("ui/backup.py", title="Respaldo", icon="💾"),
+        st.Page("ui/memory.py", title="Memoria RAC"),
+        st.Page("ui/profile.py", title="Perfil RAC"),
+        st.Page("ui/backup.py", title="Respaldo"),
     ],
 }
 

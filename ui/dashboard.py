@@ -8,7 +8,7 @@ import streamlit as st
 from rac_core.db import get_activities, get_context_events, get_profile
 from rac_core.metrics import week_bounds
 from rac_core.theme import TOKENS, render_status_grid
-from rac_core.ui_helpers import bottom_navigation
+from rac_core.mobile_nav import bottom_navigation
 
 
 WEEKDAY_LABELS = ["L", "M", "M", "J", "V", "S", "D"]
@@ -149,7 +149,12 @@ st.markdown(
             <h1 class="rac-greeting">Buenas {"mañanas" if now.hour < 12 else "tardes" if now.hour < 20 else "noches"}, {name}</h1>
             <div class="rac-date">{WEEKDAYS_ES[today.weekday()]} {today.day} de {MONTHS_ES[today.month - 1]}</div>
         </div>
-        <div class="rac-bell" aria-label="Notificaciones">♧</div>
+        <div class="rac-bell" aria-label="Notificaciones">
+            <svg viewBox="0 0 24 24" aria-hidden="true">
+                <path d="M18 8a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9"></path>
+                <path d="M10 21h4"></path>
+            </svg>
+        </div>
     </section>
     <p class="rac-daily-readiness">{readiness_text}</p>
     """,
@@ -159,21 +164,18 @@ st.markdown(
 render_status_grid(
     [
         {
-            "icon": "☾",
             "label": "Sueño",
             "value": f"{sleep_hours:g} h",
             "color": TOKENS["cyan"],
             "progress": sleep_progress,
         },
         {
-            "icon": "◖",
             "label": "Piernas",
             "value": legs_value,
             "color": TOKENS["orange"],
             "progress": 68 if pain <= 2 else 38,
         },
         {
-            "icon": "✓",
             "label": "Molestias",
             "value": discomfort_value,
             "color": discomfort_color,
@@ -185,7 +187,9 @@ render_status_grid(
 st.markdown(
     f"""
     <section class="rac-workout-card">
-        <div class="rac-workout-eyebrow"><span>🏃</span>{workout_name}</div>
+        <div class="rac-workout-eyebrow">
+            <span class="rac-run-mark" aria-hidden="true"></span>{workout_name}
+        </div>
         <div class="rac-workout-duration">{workout_minutes}<span>min</span></div>
         <div class="rac-workout-zone">{workout_zone}</div>
         <p class="rac-workout-copy">{workout_copy}</p>
@@ -195,7 +199,7 @@ st.markdown(
 )
 
 with st.container(key="rac_primary_action"):
-    if st.button("INICIAR ENTRENAMIENTO  ▶", type="primary", use_container_width=True):
+    if st.button("INICIAR ENTRENAMIENTO", type="primary", use_container_width=True):
         st.switch_page("ui/register_run.py")
 
 st.markdown(
@@ -216,7 +220,7 @@ week_days_html = "".join(
 st.markdown(
     f"""
     <section class="rac-weekly-card">
-        <div class="rac-weekly-title"><span>▥ Resumen semanal</span><span>›</span></div>
+        <div class="rac-weekly-title"><span>Resumen semanal</span></div>
         <div class="rac-weekly-metrics">
             <div class="rac-weekly-metric">
                 <div class="rac-weekly-value">{session_count} de 3</div>

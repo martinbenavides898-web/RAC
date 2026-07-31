@@ -115,7 +115,7 @@ def run_or_load(
     return result, f"Análisis nuevo · contexto compacto de {context_size(context):,} caracteres."
 
 
-run_tab, week_tab, ask_tab = st.tabs(["🏃 Último entrenamiento", "📊 Semana", "💬 Preguntar"])
+run_tab, week_tab, ask_tab = st.tabs(["Último entrenamiento", "Semana", "Preguntar"])
 
 with run_tab:
     activities = get_activities(descending=True, limit=20)

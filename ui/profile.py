@@ -8,7 +8,7 @@ page_header("Perfil RAC", "Memoria estable y editable del corredor y del coach."
 profile = get_profile()
 
 basic_tab, running_tab, coach_tab, raw_tab = st.tabs(
-    ["👤 Corredor", "🏃 Historial y disponibilidad", "🧠 Coach", "🧩 Memoria estructurada"]
+    ["Corredor", "Historial y disponibilidad", "Coach", "Memoria estructurada"]
 )
 
 with basic_tab:

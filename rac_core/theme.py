@@ -104,13 +104,67 @@ def apply_global_theme() -> None:
             color: var(--rac-text);
         }
 
-        .rac-sidebar-logo {
+        [data-testid="stSidebarNav"]::before {
+            content: "RAC";
+            display: block;
+            padding: 0.7rem 1rem 1rem;
             color: var(--rac-orange);
-            font-size: 1.75rem;
-            font-weight: 900;
+            font-size: 3rem;
+            line-height: 0.9;
+            font-weight: 950;
+            font-style: italic;
+            letter-spacing: -0.09em;
+            text-shadow: 0 0 24px rgba(255, 94, 20, 0.18);
+        }
+
+        [data-testid="stSidebarNav"] a {
+            min-height: 48px;
+            border-radius: 12px;
+        }
+
+        [data-testid="stSidebarNav"] a span,
+        [data-testid="stSidebarNav"] a p {
+            font-size: 1.02rem !important;
+            font-weight: 650 !important;
+        }
+
+        [data-testid="stSidebarNav"] [data-testid="stNavSectionHeader"] {
+            margin-top: 0.85rem;
+            font-size: 0.82rem !important;
+            letter-spacing: 0.035em;
+        }
+
+        .rac-sidebar-meta {
+            margin-top: 1.1rem;
+            padding-top: 1rem;
+            border-top: 1px solid var(--rac-border);
+        }
+
+        .rac-sidebar-footer-logo {
+            margin-bottom: 0.8rem;
+            color: var(--rac-orange);
+            font-size: 2rem;
+            line-height: 1;
+            font-weight: 950;
             font-style: italic;
             letter-spacing: -0.08em;
-            margin: 0.25rem 0 0.4rem;
+        }
+
+        .rac-sidebar-version {
+            margin-bottom: 0.8rem;
+            color: var(--rac-muted);
+            font-size: 0.78rem;
+            line-height: 1.45;
+        }
+
+        .rac-sidebar-status {
+            padding: 0.95rem;
+            color: #BFE9CF;
+            font-size: 0.86rem;
+            line-height: 1.55;
+            border: 1px solid rgba(53, 208, 127, 0.18);
+            border-radius: 14px;
+            background: rgba(53, 208, 127, 0.11);
         }
 
         div[data-testid="stMetric"] {
@@ -228,6 +282,16 @@ def apply_global_theme() -> None:
             box-shadow: var(--rac-shadow);
         }
 
+        .rac-bell svg {
+            width: 21px;
+            height: 21px;
+            fill: none;
+            stroke: currentColor;
+            stroke-width: 1.8;
+            stroke-linecap: round;
+            stroke-linejoin: round;
+        }
+
         .rac-bell::after {
             content: "";
             position: absolute;
@@ -271,9 +335,13 @@ def apply_global_theme() -> None:
             min-width: 0;
         }
 
-        .rac-status-icon {
-            font-size: 1rem;
-            line-height: 1;
+        .rac-status-dot {
+            width: 8px;
+            height: 8px;
+            flex: 0 0 8px;
+            border-radius: 50%;
+            background: var(--rac-status-color);
+            box-shadow: 0 0 12px color-mix(in srgb, var(--rac-status-color) 58%, transparent);
         }
 
         .rac-status-label {
@@ -337,6 +405,38 @@ def apply_global_theme() -> None:
             font-weight: 850;
             letter-spacing: 0.04em;
             text-transform: uppercase;
+        }
+
+        .rac-run-mark {
+            position: relative;
+            display: inline-block;
+            width: 18px;
+            height: 14px;
+            flex: 0 0 18px;
+        }
+
+        .rac-run-mark::before,
+        .rac-run-mark::after {
+            content: "";
+            position: absolute;
+            height: 2px;
+            border-radius: 999px;
+            background: var(--rac-orange);
+            transform-origin: left center;
+        }
+
+        .rac-run-mark::before {
+            top: 4px;
+            left: 2px;
+            width: 14px;
+            transform: rotate(-22deg);
+        }
+
+        .rac-run-mark::after {
+            top: 10px;
+            left: 5px;
+            width: 11px;
+            transform: rotate(24deg);
         }
 
         .rac-workout-duration {
@@ -579,7 +679,6 @@ def apply_global_theme() -> None:
 
 def status_card_html(
     *,
-    icon: str,
     label: str,
     value: str,
     color: str,
@@ -589,7 +688,7 @@ def status_card_html(
     return f"""
     <div class="rac-status-card" style="--rac-status-color:{escape(color)};--rac-status-progress:{safe_progress}%">
         <div class="rac-status-top">
-            <span class="rac-status-icon" style="color:{escape(color)}">{escape(icon)}</span>
+            <span class="rac-status-dot" aria-hidden="true"></span>
             <span class="rac-status-label">{escape(label)}</span>
         </div>
         <div class="rac-status-value">{escape(value)}</div>
