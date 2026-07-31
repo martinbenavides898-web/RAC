@@ -20,19 +20,20 @@ page_header("Coach IA", "Análisis con memoria propia, contexto compacto y respu
 
 available, detail = coach_available()
 if not available:
-    st.warning("El coach todavía no tiene una clave de OpenAI configurada.")
+    st.warning("El coach todavía no tiene una clave de Gemini configurada.")
     st.code(
-        '[openai]\napi_key = "PEGA_AQUI_TU_CLAVE"\nmodel = "gpt-5-mini"',
+        '[gemini]\napi_key = "PEGA_AQUI_TU_CLAVE"\nmodel = "gemini-2.5-flash-lite"',
         language="toml",
     )
     st.caption(detail)
+    st.caption("La clave se crea gratis en Google AI Studio. No la subas a GitHub ni la pegues en el chat.")
     st.stop()
 
 usage = get_usage_totals()
 c1, c2, c3 = st.columns(3)
-c1.metric("Modelo", configured_model())
+c1.metric("Modelo Gemini", configured_model())
 c2.metric("Análisis guardados", usage["calls"])
-c3.metric("Tokens acumulados", f'{usage["input_tokens"] + usage["output_tokens"]:,}')
+c3.metric("Tokens procesados", f'{usage["input_tokens"] + usage["output_tokens"]:,}')
 
 
 def render_analysis(result: dict, *, cache_label: str = "") -> None:

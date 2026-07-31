@@ -4,12 +4,13 @@ import json
 from typing import Any
 
 import streamlit as st
-from openai import OpenAI
+from google import genai
+from google.genai import types
 
 from rac_core.coach_models import CoachAnalysis
 from rac_core.memory import PROMPT_VERSION
 
-DEFAULT_MODEL = "gpt-5-mini"
+DEFAULT_MODEL = "gemini-2.5-flash-lite"
 
 SYSTEM_INSTRUCTIONS = """
 Eres RAC, el coach personal de running de Martín.
@@ -32,11 +33,11 @@ CRITERIOS DE ANÁLISIS
 
 SEGURIDAD
 - No sustituyes a un médico, kinesiólogo, nutricionista o psicólogo.
-- Si el dolor es intenso, creciente, altera la marcha/técnica, persiste o hay otros signos preocupantes,
+- Si el dolor es intenso, creciente, altera la marcha o la técnica, persiste o hay otros signos preocupantes,
   recomienda evaluación profesional con calma y sin alarmismo.
 
 RESPUESTA
-- Usa el esquema solicitado.
+- Usa estrictamente el esquema solicitado.
 - La evidencia debe citar solo datos presentes en el contexto.
 - La próxima sesión debe ser concreta, prudente y coherente con la disponibilidad del perfil.
 - memory_candidate solo debe contener un hecho estable y útil. No guardes emociones momentáneas ni datos redundantes.
@@ -44,22 +45,25 @@ RESPUESTA
 
 
 @st.cache_resource
-def openai_client() -> OpenAI:
+def gemini_client() -> genai.Client:
+    """Crea un cliente de Gemini del lado del servidor usando Streamlit Secrets."""
     try:
-        config = st.secrets["openai"]
+        config = st.secrets["gemini"]
         api_key = str(config["api_key"]).strip()
     except (KeyError, FileNotFoundError) as exc:
         raise RuntimeError(
-            "Falta [openai] api_key en Streamlit Secrets."
+            "Falta [gemini] api_key en Streamlit Secrets."
         ) from exc
+
     if not api_key:
-        raise RuntimeError("La clave de OpenAI está vacía.")
-    return OpenAI(api_key=api_key)
+        raise RuntimeError("La clave de Gemini está vacía.")
+
+    return genai.Client(api_key=api_key)
 
 
 def configured_model() -> str:
     try:
-        value = str(st.secrets["openai"].get("model", DEFAULT_MODEL)).strip()
+        value = str(st.secrets["gemini"].get("model", DEFAULT_MODEL)).strip()
         return value or DEFAULT_MODEL
     except (KeyError, FileNotFoundError):
         return DEFAULT_MODEL
@@ -67,35 +71,54 @@ def configured_model() -> str:
 
 def coach_available() -> tuple[bool, str]:
     try:
-        openai_client()
+        gemini_client()
         return True, configured_model()
     except Exception as exc:
         return False, str(exc)
 
 
+def _parse_response(response: Any) -> CoachAnalysis:
+    parsed = getattr(response, "parsed", None)
+    if isinstance(parsed, CoachAnalysis):
+        return parsed
+    if isinstance(parsed, dict):
+        return CoachAnalysis.model_validate(parsed)
+
+    text = getattr(response, "text", None)
+    if text:
+        return CoachAnalysis.model_validate_json(text)
+
+    prompt_feedback = getattr(response, "prompt_feedback", None)
+    block_reason = getattr(prompt_feedback, "block_reason", None) if prompt_feedback else None
+    if block_reason:
+        raise RuntimeError(f"Gemini bloqueó la respuesta: {block_reason}")
+
+    raise RuntimeError("Gemini no devolvió un análisis estructurado.")
+
+
 def generate_analysis(context: dict[str, Any]) -> tuple[dict[str, Any], dict[str, int | None]]:
     model = configured_model()
-    response = openai_client().responses.parse(
-        model=model,
-        instructions=SYSTEM_INSTRUCTIONS,
-        input=json.dumps(context, ensure_ascii=False, default=str),
-        text_format=CoachAnalysis,
-        max_output_tokens=1800,
-        store=False,
+    prompt = (
+        "Analiza el siguiente contexto de RAC. No agregues datos que no estén presentes.\n\n"
+        + json.dumps(context, ensure_ascii=False, default=str, separators=(",", ":"))
     )
 
-    if response.status != "completed":
-        reason = getattr(response.incomplete_details, "reason", None)
-        raise RuntimeError(f"La respuesta del coach no se completó. Motivo: {reason or response.status}")
+    response = gemini_client().models.generate_content(
+        model=model,
+        contents=prompt,
+        config=types.GenerateContentConfig(
+            system_instruction=SYSTEM_INSTRUCTIONS,
+            response_mime_type="application/json",
+            response_schema=CoachAnalysis,
+            max_output_tokens=1800,
+        ),
+    )
 
-    parsed = response.output_parsed
-    if parsed is None:
-        raise RuntimeError("El modelo no devolvió un análisis estructurado.")
-
-    usage = getattr(response, "usage", None)
+    parsed = _parse_response(response)
+    usage = getattr(response, "usage_metadata", None)
     usage_data = {
-        "input_tokens": getattr(usage, "input_tokens", None) if usage else None,
-        "output_tokens": getattr(usage, "output_tokens", None) if usage else None,
+        "input_tokens": getattr(usage, "prompt_token_count", None) if usage else None,
+        "output_tokens": getattr(usage, "candidates_token_count", None) if usage else None,
     }
     return parsed.model_dump(), usage_data
 

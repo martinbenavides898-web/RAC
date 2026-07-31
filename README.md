@@ -1,29 +1,32 @@
-# RAC — Running App Coach v0.3
+# RAC — Running App Coach v0.3.1 · Gemini
 
-RAC es una aplicación personal de running construida con Streamlit, Supabase y un coach IA opcional.
+RAC es una aplicación personal de running construida con Streamlit, Supabase y Gemini.
 
-## v0.3
+## v0.3.1
 
-- Perfil estructurado y editable.
-- Memorias seleccionadas, con activación/desactivación manual.
-- Coach IA para entrenamiento, semana y preguntas.
-- Contexto compacto: perfil + memorias activas + últimos 14 días.
-- Caché en Supabase: si los datos no cambian, reutiliza el análisis y no cobra otra llamada.
-- No guarda prompts completos ni conversaciones infinitas.
-- La API se llama con `store=False`; la memoria oficial vive en Supabase.
-- Seguimiento de tokens acumulados.
+- Gemini reemplaza a OpenAI como motor del Coach IA.
+- Modelo inicial: `gemini-2.5-flash-lite`.
+- Salidas estructuradas mediante Pydantic.
+- Perfil, memorias y últimos 14 días se envían como contexto compacto.
+- Los análisis se reutilizan desde Supabase si los datos no cambiaron.
+- No se guarda una conversación infinita: la memoria oficial vive en Supabase.
+- Seguimiento de tokens procesados.
 
-## Orden de instalación
+## Instalación
 
-1. Ejecutar `supabase_v0_3.sql` en Supabase SQL Editor.
-2. Subir los archivos al repositorio RAC.
-3. Mantener los secretos Supabase existentes.
-4. Agregar en Streamlit Secrets:
+1. Mantener las tablas de Supabase creadas para RAC v0.3.
+2. Subir estos archivos al repositorio RAC.
+3. Mantener el bloque `[supabase]` existente en Streamlit Secrets.
+4. Crear una API key en Google AI Studio y agregar:
 
 ```toml
-[openai]
+[gemini]
 api_key = "TU_API_KEY"
-model = "gpt-5-mini"
+model = "gemini-2.5-flash-lite"
 ```
 
 La clave nunca debe subirse a GitHub.
+
+## Privacidad
+
+En el nivel gratuito de Gemini, Google puede usar el contenido enviado para mejorar sus productos. RAC reduce lo enviado a un contexto deportivo compacto, pero no se deben escribir identificadores personales innecesarios ni información clínica sensible en las notas.
