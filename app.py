@@ -22,9 +22,9 @@ st.sidebar.markdown(
     """
     <div class="rac-sidebar-meta">
         <div class="rac-sidebar-footer-logo">RAC</div>
-        <div class="rac-sidebar-version">Running Assist Coach · v0.4.1 visual · Gemini</div>
+        <div class="rac-sidebar-version">Running Assist Coach · v0.4.2 visual · Gemini</div>
         <div class="rac-sidebar-status">
-            Supabase activo. Gemini es el coach IA; RAC conserva datos, perfil, memorias y análisis estructurados.
+            Supabase y Gemini están activos. Tus datos, perfil, memorias y análisis permanecen conectados.
         </div>
     </div>
     """,

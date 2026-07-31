@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from datetime import date, datetime
+from html import escape
 from zoneinfo import ZoneInfo
 
 import streamlit as st
@@ -8,7 +9,6 @@ import streamlit as st
 from rac_core.db import get_activities, get_context_events, get_profile
 from rac_core.metrics import week_bounds
 from rac_core.theme import TOKENS, render_status_grid
-from rac_core.mobile_nav import bottom_navigation
 
 
 WEEKDAY_LABELS = ["L", "M", "M", "J", "V", "S", "D"]
@@ -22,9 +22,7 @@ WEEKDAYS_ES = ["lunes", "martes", "miércoles", "jueves", "viernes", "sábado", 
 def _format_duration(total_minutes: float) -> str:
     minutes = max(0, int(round(total_minutes)))
     hours, remaining = divmod(minutes, 60)
-    if hours:
-        return f"{hours} h {remaining:02d} min"
-    return f"{remaining} min"
+    return f"{hours} h {remaining:02d} min" if hours else f"{remaining} min"
 
 
 def _latest_sleep(events: list[dict], profile: dict) -> float:
@@ -113,7 +111,6 @@ else:
     discomfort_progress = 38
 
 sleep_progress = int(min(100, max(18, sleep_hours / 8 * 100)))
-
 session_count = len(activities)
 total_distance = sum(float(item.get("distance_km") or 0) for item in activities)
 total_minutes = sum(float(item.get("duration_min") or 0) for item in activities)
@@ -139,107 +136,53 @@ else:
         "La sesión busca sumar volumen sin aumentar innecesariamente la carga de tus piernas."
     )
 
-st.markdown('<main class="rac-app-shell">', unsafe_allow_html=True)
-
-st.markdown(
-    f"""
-    <section class="rac-topbar">
-        <div>
-            <div class="rac-wordmark">RAC</div>
-            <h1 class="rac-greeting">Buenas {"mañanas" if now.hour < 12 else "tardes" if now.hour < 20 else "noches"}, {name}</h1>
-            <div class="rac-date">{WEEKDAYS_ES[today.weekday()]} {today.day} de {MONTHS_ES[today.month - 1]}</div>
-        </div>
-        <div class="rac-bell" aria-label="Notificaciones">
-            <svg viewBox="0 0 24 24" aria-hidden="true">
-                <path d="M18 8a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9"></path>
-                <path d="M10 21h4"></path>
-            </svg>
-        </div>
-    </section>
-    <p class="rac-daily-readiness">{readiness_text}</p>
-    """,
-    unsafe_allow_html=True,
+greeting = "mañanas" if now.hour < 12 else "tardes" if now.hour < 20 else "noches"
+header_html = (
+    '<section class="rac-home-header">'
+    '<div class="rac-wordmark">RAC</div>'
+    f'<h1 class="rac-greeting">Buenas {greeting}, {escape(name)}</h1>'
+    f'<div class="rac-date">{WEEKDAYS_ES[today.weekday()]} {today.day} de {MONTHS_ES[today.month - 1]}</div>'
+    f'<p class="rac-daily-readiness">{escape(readiness_text)}</p>'
+    '</section>'
 )
+st.html(header_html)
 
 render_status_grid(
     [
-        {
-            "label": "Sueño",
-            "value": f"{sleep_hours:g} h",
-            "color": TOKENS["cyan"],
-            "progress": sleep_progress,
-        },
-        {
-            "label": "Piernas",
-            "value": legs_value,
-            "color": TOKENS["orange"],
-            "progress": 68 if pain <= 2 else 38,
-        },
-        {
-            "label": "Molestias",
-            "value": discomfort_value,
-            "color": discomfort_color,
-            "progress": discomfort_progress,
-        },
+        {"label": "Sueño", "value": f"{sleep_hours:g} h", "color": TOKENS["cyan"], "progress": sleep_progress},
+        {"label": "Piernas", "value": legs_value, "color": TOKENS["orange"], "progress": 68 if pain <= 2 else 38},
+        {"label": "Molestias", "value": discomfort_value, "color": discomfort_color, "progress": discomfort_progress},
     ]
 )
 
-st.markdown(
-    f"""
-    <section class="rac-workout-card">
-        <div class="rac-workout-eyebrow">
-            <span class="rac-run-mark" aria-hidden="true"></span>{workout_name}
-        </div>
-        <div class="rac-workout-duration">{workout_minutes}<span>min</span></div>
-        <div class="rac-workout-zone">{workout_zone}</div>
-        <p class="rac-workout-copy">{workout_copy}</p>
-    </section>
-    """,
-    unsafe_allow_html=True,
-)
-
-with st.container(key="rac_primary_action"):
+with st.container(key="rac_workout_section"):
+    st.html(
+        '<div class="rac-workout-eyebrow">' + escape(workout_name) + '</div>'
+        f'<div class="rac-workout-duration">{workout_minutes}<span>min</span></div>'
+        '<div class="rac-workout-zone">' + escape(workout_zone) + '</div>'
+        '<p class="rac-workout-copy">' + escape(workout_copy) + '</p>'
+    )
     if st.button("INICIAR ENTRENAMIENTO", type="primary", use_container_width=True):
         st.switch_page("ui/register_run.py")
 
-st.markdown(
-    f"""
-    <details class="rac-coach-note" open>
-        <summary>¿Por qué este entrenamiento?</summary>
-        <p>{explanation}</p>
-    </details>
-    """,
-    unsafe_allow_html=True,
-)
+with st.container(key="rac_explanation"):
+    with st.expander("¿Por qué este entrenamiento?", expanded=True):
+        st.write(explanation)
 
 week_days_html = "".join(
     f'<div class="rac-week-day{" is-trained" if idx in trained_weekdays else ""}{" is-today" if idx == today.weekday() else ""}">{label}</div>'
     for idx, label in enumerate(WEEKDAY_LABELS)
 )
 
-st.markdown(
-    f"""
-    <section class="rac-weekly-card">
-        <div class="rac-weekly-title"><span>Resumen semanal</span></div>
-        <div class="rac-weekly-metrics">
-            <div class="rac-weekly-metric">
-                <div class="rac-weekly-value">{session_count} de 3</div>
-                <div class="rac-weekly-label">sesiones</div>
-            </div>
-            <div class="rac-weekly-metric">
-                <div class="rac-weekly-value">{total_distance:.1f} km</div>
-                <div class="rac-weekly-label">distancia</div>
-            </div>
-            <div class="rac-weekly-metric">
-                <div class="rac-weekly-value">{_format_duration(total_minutes)}</div>
-                <div class="rac-weekly-label">tiempo total</div>
-            </div>
-        </div>
-        <div class="rac-week-strip">{week_days_html}</div>
-    </section>
-    """,
-    unsafe_allow_html=True,
+weekly_html = (
+    '<section class="rac-weekly-card">'
+    '<div class="rac-weekly-title">Resumen semanal</div>'
+    '<div class="rac-weekly-metrics">'
+    f'<div><div class="rac-weekly-value">{session_count} de 3</div><div class="rac-weekly-label">sesiones</div></div>'
+    f'<div><div class="rac-weekly-value">{total_distance:.1f} km</div><div class="rac-weekly-label">distancia</div></div>'
+    f'<div><div class="rac-weekly-value">{escape(_format_duration(total_minutes))}</div><div class="rac-weekly-label">tiempo total</div></div>'
+    '</div>'
+    f'<div class="rac-week-strip">{week_days_html}</div>'
+    '</section>'
 )
-
-st.markdown("</main>", unsafe_allow_html=True)
-bottom_navigation(active="today")
+st.html(weekly_html)
