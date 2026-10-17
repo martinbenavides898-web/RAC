@@ -7,10 +7,10 @@ SANTIAGO_TZ = ZoneInfo("America/Santiago")
 
 
 def now_cl() -> datetime:
-    """Current date and time in Santiago, Chile."""
+    """Retorna la fecha y hora actual en Santiago de Chile."""
     return datetime.now(SANTIAGO_TZ)
 
 
 def today_cl() -> date:
-    """Current date in Santiago, Chile."""
+    """Retorna la fecha actual en Santiago de Chile."""
     return now_cl().date()

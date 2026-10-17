@@ -26,18 +26,18 @@ if drive_status["connected"]:
     st.success(f"Google Drive conectado: {drive_status['user']} · Modo: {drive_status['mode']}")
 else:
     st.warning(drive_status["message"])
-    with st.expander("Instrucciones de activación de Google Drive API v3 (OAuth 2.0)"):
+    with st.expander("Instrucciones de activación de Google Drive API v3 (OAuth 2.0 / Service Account)"):
         st.markdown(
             """
-            1. En **Google Cloud Console**, habilita **Google Drive API** y configura la pantalla de consentimiento OAuth.
-            2. Genera un `refresh_token` OAuth con el alcance `https://www.googleapis.com/auth/drive.file`.
-            3. Agrega en Streamlit Cloud → **Settings → Secrets** (o `.streamlit/secrets.toml` local; nunca en GitHub):
+            1. En **Google Cloud Console**, habilita **Google Drive API**.
+            2. Crea credenciales con el alcance mínimo `https://www.googleapis.com/auth/drive.file`.
+            3. Agrega en tu archivo `.streamlit/secrets.toml` (nunca en GitHub):
             ```toml
             [gdrive]
             client_id = "TU_CLIENT_ID"
             client_secret = "TU_CLIENT_SECRET"
             refresh_token = "TU_REFRESH_TOKEN"
-            root_folder_id = "ID_CARPETA_PADRE_OPCIONAL"
+            root_folder_id = "ID_CARPETA_OPCIONAL"
             ```
             """
         )

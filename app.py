@@ -38,6 +38,7 @@ pages = {
         st.Page("ui/register_run.py", title="Registrar entrenamiento"),
         st.Page("ui/context_day.py", title="Sick / estudio / descanso"),
         st.Page("ui/coach.py", title="Coach IA"),
+        st.Page("ui/marathon.py", title="Maratón 42K · RAC 2.0"),
     ],
     "Seguimiento": [
         st.Page("ui/weekly_report.py", title="Reporte semanal"),

@@ -5,12 +5,16 @@ from typing import Any
 import pandas as pd
 
 
-def generate_activity_fingerprint(activity_date: str, distance_km: float, duration_min: float, sport: str) -> str:
-    raw = f"{activity_date.strip()}|{sport.strip().lower()}|{round(float(distance_km), 2)}|{round(float(duration_min), 1)}"
+def generate_activity_fingerprint(
+    activity_date: str, distance_km: float, duration_min: float, sport: str
+) -> str:
+    raw = f"{activity_date.strip()} | {sport.strip().lower()} | {round(float(distance_km), 2)} | {round(float(duration_min), 1)}"
     return hashlib.sha256(raw.encode("utf-8")).hexdigest()
 
 
-def parse_and_normalize_csv(df: pd.DataFrame, source_label: str = "csv_import") -> list[dict[str, Any]]:
+def parse_and_normalize_csv(
+    df: pd.DataFrame, source_label: str = "csv_import"
+) -> list[dict[str, Any]]:
     """
     Normaliza columnas comunes (español o inglés) a la estructura de `activities` de RAC 2.0.
     """
@@ -39,7 +43,8 @@ def parse_and_normalize_csv(df: pd.DataFrame, source_label: str = "csv_import") 
     for _, row in df.iterrows():
         raw_date = str(row[date_col])[:10]
         dist_val = float(row[dist_col] or 0.0)
-        # Si la distancia viene en metros (ej. > 100 para una sola sesión de running), convertir a km
+
+        # Si la distancia viene en metros (ej. > 120), convertir a km
         if dist_val > 120:
             dist_val = round(dist_val / 1000.0, 3)
 
@@ -48,8 +53,14 @@ def parse_and_normalize_csv(df: pd.DataFrame, source_label: str = "csv_import") 
         if dur_val > 600:
             dur_val = round(dur_val / 60.0, 2)
 
-        act_type = str(row[type_col]).strip() if type_col and pd.notna(row[type_col]) else "Rodaje importado"
-        fingerprint = generate_activity_fingerprint(raw_date, dist_val, dur_val, "Running")
+        act_type = (
+            str(row[type_col]).strip()
+            if type_col and pd.notna(row[type_col])
+            else "Rodaje importado"
+        )
+        fingerprint = generate_activity_fingerprint(
+            raw_date, dist_val, dur_val, "Running"
+        )
 
         records.append(
             {
@@ -60,10 +71,14 @@ def parse_and_normalize_csv(df: pd.DataFrame, source_label: str = "csv_import") 
                 "surface": "Calle",
                 "distance_km": dist_val,
                 "duration_min": dur_val,
-                "avg_hr": int(row[hr_col]) if hr_col and pd.notna(row[hr_col]) and float(row[hr_col]) > 0 else None,
+                "avg_hr": int(row[hr_col])
+                if hr_col and pd.notna(row[hr_col]) and float(row[hr_col]) > 0
+                else None,
                 "max_hr": None,
                 "elevation_gain_m": None,
-                "cadence_spm": float(row[cad_col]) if cad_col and pd.notna(row[cad_col]) and float(row[cad_col]) > 0 else None,
+                "cadence_spm": float(row[cad_col])
+                if cad_col and pd.notna(row[cad_col]) and float(row[cad_col]) > 0
+                else None,
                 "rpe": 5,
                 "pain_before": 0,
                 "pain_during": 0,
@@ -77,4 +92,5 @@ def parse_and_normalize_csv(df: pd.DataFrame, source_label: str = "csv_import") 
                 "notes": f"Importado desde {source_label}",
             }
         )
+
     return records

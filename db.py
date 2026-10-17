@@ -206,10 +206,9 @@ def export_all() -> dict[str, Any]:
         "activities": get_activities(descending=False),
         "context_events": get_context_events(descending=False),
         "shoes": get_shoes(active_only=False),
-        "strength_logs": (
-            list(client().table("strength_logs").select("*").order("log_date").execute().data or [])
-            if _table_exists("strength_logs")
-            else []
+        "strength_logs": list(
+            client().table("strength_logs").select("*").order("log_date").execute().data
+            or []
         ),
         "profile": get_profile(),
         "coach_memories": get_memories(active_only=False) if _table_exists("coach_memories") else [],

@@ -30,18 +30,3 @@ La clave nunca debe subirse a GitHub.
 ## Privacidad
 
 En el nivel gratuito de Gemini, Google puede usar el contenido enviado para mejorar sus productos. RAC reduce lo enviado a un contexto deportivo compacto, pero no se deben escribir identificadores personales innecesarios ni información clínica sensible en las notas.
-
-
-## Google Drive (OAuth 2.0)
-
-La pantalla de respaldo usa OAuth 2.0 con un `refresh_token`; no se admiten credenciales de cuenta de servicio en esta implementación. Configura los secretos del servidor, nunca los subas al repositorio:
-
-```toml
-[gdrive]
-client_id = "TU_CLIENT_ID"
-client_secret = "TU_CLIENT_SECRET"
-refresh_token = "TU_REFRESH_TOKEN"
-root_folder_id = "ID_CARPETA_PADRE_OPCIONAL"
-```
-
-La verificación compara el SHA-256 del archivo descargado desde Drive con el archivo enviado y valida también el hash del contenido del respaldo. Ejecuta `supabase_v0_3.sql` en el SQL Editor de Supabase para crear las tablas de memoria, análisis y registro de respaldos.
