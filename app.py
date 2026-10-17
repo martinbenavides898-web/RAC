@@ -1,5 +1,6 @@
-import streamlit as st
+from __future__ import annotations
 
+import streamlit as st
 from rac_core.db import init_db
 from rac_core.theme import apply_global_theme
 
