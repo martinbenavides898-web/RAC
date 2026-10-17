@@ -1,35 +1,3 @@
-from __future__ import annotations
-
-from datetime import date, timedelta
-import math
-import xml.etree.ElementTree as ET
-
-import pandas as pd
-import streamlit as st
-
-from rac_core.db import get_activities, get_profile, set_profile_value
-from rac_core.ui_helpers import page_header
-
-RACE_KEY = "rac_2_marathon"
-DEFAULT_RACE_DATE = date(2027, 4, 18)  # Editable placeholder, not an official-date claim.
-DAYS = ["Lunes", "Martes", "Miércoles", "Jueves", "Viernes", "Sábado", "Domingo"]
-
-
-def _as_date(value, fallback: date) -> date:
-    try:
-        return date.fromisoformat(str(value))
-    except (TypeError, ValueError):
-        return fallback
-
-
-def _gpx_summary(raw: bytes) -> dict:
-    root = ET.fromstring(raw)
-    points = []
-    for node in root.iter():
-        if node.tag.rsplit("}", 1)[-1] == "trkpt":
-            lat, lon = float(node.attrib["lat"]), float(node.attrib["lon"])
-            ele_node = next((x for x in node if x.tag.rsplit("}", 1)[-1] == "ele"), None)
-            ele = float(ele_node.text) if ele_node is not None and ele_node.text else None
             points.append((lat, lon, ele))
     if len(points) < 2:
         raise ValueError("El GPX no contiene suficientes puntos de recorrido.")
@@ -158,5 +126,3 @@ st.subheader("Reglas de seguridad")
 st.markdown(
     "- No aumentes la carga solo porque lo diga el calendario.\n"
     "- Si el dolor cambia tu técnica, empeora o persiste, detén la sesión y busca evaluación apropiada.\n"
-    "- Esta es la primera pantalla de RAC 2.0; todavía no sustituye un plan individualizado ni una valoración clínica."
-)
